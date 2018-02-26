@@ -1,6 +1,8 @@
 package com.yhaitao.mark.chinaz;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -11,8 +13,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.wltea.analyzer.lucene.IKAnalyzer;
 
 import com.yhaitao.mark.chinaz.bean.ChinazWeb;
 import com.yhaitao.mark.http.MarkHttpClient;
@@ -65,10 +70,16 @@ public class ChinazCrawler {
 	private static String outdata(List<ChinazWeb> filterList) {
 		StringBuffer outData = new StringBuffer();
 		for(ChinazWeb web : filterList) {
-			if(outData.length() > 0) {
-				outData.append("\n");
-			}
-			outData.append(getDomainId(web.getDomain())).append(" ").append(web.getName()).append(" ").append(web.getDesc().replace("网站简介：", ""));
+			try {
+				if(outData.length() > 0) {
+					outData.append("\n");
+				}
+				List<String> termList = analyzer(web.getName() + " " + web.getDesc().replace("网站简介：", ""));
+				outData.append(getDomainId(web.getDomain())).append(" ");
+				for(String term : termList) {
+					outData.append(term).append(" ");
+				}
+			} catch (IOException e) {}
 		}
 		return outData.toString();
 	}
@@ -148,5 +159,25 @@ public class ChinazCrawler {
             }
         }
 		return title;
+	}
+	
+	/**
+	 * IK分词。
+	 * @param context 输入文本
+	 * @return 分词列表
+	 * @throws IOException 
+	 */
+	private static List<String> analyzer(String context) throws IOException {
+		IKAnalyzer iKAnalyzer = new IKAnalyzer();
+		StringReader reader = new StringReader(context);
+		TokenStream tokenStream = iKAnalyzer.tokenStream("", reader);
+		List<String> termList = new ArrayList<String>();
+		while(tokenStream.incrementToken()) {
+			CharTermAttribute termAttri = tokenStream.getAttribute(CharTermAttribute.class);
+			termList.add(termAttri.toString());
+		}
+		reader.close();
+		iKAnalyzer.close();
+		return termList;
 	}
 }

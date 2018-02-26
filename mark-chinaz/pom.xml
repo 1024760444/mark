@@ -128,7 +128,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>com.yhaitao.mark.KMeansCluster</mainClass>
+							<mainClass>com.yhaitao.mark.chinaz.ChinazCrawler</mainClass>
 							<addClasspath>true</addClasspath>
 							<classpathPrefix>lib/</classpathPrefix>
 						</manifest>

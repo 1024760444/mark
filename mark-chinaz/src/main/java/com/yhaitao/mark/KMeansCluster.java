@@ -49,12 +49,15 @@ public class KMeansCluster {
 		Configuration conf = new Configuration();
 		URI[] uriArray = getExtJars(conf, extJars);
 		String sfiles = StringUtils.uriToString(uriArray);
+		System.err.println("---------------- step 0 ---------------- sfiles : " + sfiles);
 		conf.set(MRJobConfig.CACHE_FILES, sfiles);
 		
 		// 数据写入HDFS
+		System.err.println("---------------- step 1 ----------------");
 		writeToSequenceFile(conf, original, in);
 		
 		// 生成向量
+		System.err.println("---------------- step 2 ----------------");
 		sequenceToSparse(conf, in, out);
 	}
 	
