@@ -92,7 +92,7 @@ public class MarkHttpClient {
 	 *             爬取异常，或域名不存在、或请求超时、或协议错误等
 	 */
 	public String httpGet(String url) throws Exception {
-		return httpGet(url, 24000);
+		return httpGet(url, 48000);
 	}
 
 	/**

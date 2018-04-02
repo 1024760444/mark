@@ -1,12 +1,11 @@
 package com.yhaitao.mark;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,46 +27,64 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.mahout.vectorizer.SparseVectorsFromSequenceFiles;
 
+import com.google.gson.Gson;
+
 /**
  * Kmean聚类实现。
  * @author yhaitao
  *
  */
 public class KMeansCluster {
+	public final static Gson GSON = new Gson();
+	
+	/**
+	 * 任务入口。
+	 * @param args
+	 * @throws Exception
+	 */
 	public static void main(String[] args) throws Exception {
 		// 参数解析，获取参数
 		CommandLine commands = getCommandLine(args);
 		if(commands == null) {
 			return ;
 		}
-		String original = commands.getOptionValue("original");
 		String in = commands.getOptionValue("in");
-		String out = commands.getOptionValue("out");
 		String extJars = commands.getOptionValue("extJars");
+		String local = commands.getOptionValue("local");
 		
 		// 参数设置
 		Configuration conf = new Configuration();
 		URI[] uriArray = getExtJars(conf, extJars);
 		String sfiles = StringUtils.uriToString(uriArray);
-		System.err.println("---------------- step 0 ---------------- sfiles : " + sfiles);
 		conf.set(MRJobConfig.CACHE_FILES, sfiles);
 		
+		Map<String, String> map = KMeansCluster.readOriginalFile(local);
+		
 		// 数据写入HDFS
-		System.err.println("---------------- step 1 ----------------");
-		writeToSequenceFile(conf, original, in);
+		writeToSequenceFile(conf, in, map);
 		
 		// 生成向量
-		System.err.println("---------------- step 2 ----------------");
-		sequenceToSparse(conf, in, out);
+		// sequenceToSparse(conf, in, out);
 	}
 	
+	@SuppressWarnings("unchecked")
+	private static Map<String, String> readOriginalFile(String local) throws IOException {
+		InputStreamReader reader = new InputStreamReader(new FileInputStream(local));
+		BufferedReader br = new BufferedReader(reader);
+		String line = br.readLine();
+		Map<String, String> fromJson = GSON.fromJson(line, Map.class);
+		br.close();
+		reader.close();
+		return fromJson;
+	}
+
 	/**
 	 * 生成向量
 	 * @param in
 	 * @param out
 	 * @throws Exception 
 	 */
-	private static void sequenceToSparse(Configuration conf, String in, String out) throws Exception {
+	public static void sequenceToSparse(Configuration conf, String in, String out) throws Exception {
 		String[] args = {
 				"-i", in,
 				"-o", out,
@@ -107,9 +124,9 @@ public class KMeansCluster {
 	 * @param in
 	 * @throws IOException 
 	 */
-	private static void writeToSequenceFile(Configuration conf, String original, String in) throws IOException {
+	private static void writeToSequenceFile(Configuration conf, String in, Map<String, String> map) throws IOException {
 		// SequenceFile写入工具
-		Path path = new Path(in + "/original-seqdir/part-m-00000");
+		Path path = new Path(in + "/part-m-00000");
 		SequenceFile.Writer writer = SequenceFile.createWriter(
 				conf, 
 				new SequenceFile.Writer.Option[]{
@@ -119,7 +136,6 @@ public class KMeansCluster {
 				});
 		
 		// 写入数据
-		Map<String, String> map = KMeansCluster.readOriginalFile(original);
 		for(String key : map.keySet()) {
 			String value = map.get(key);
 			writer.append(new Text(key), new Text(value));
@@ -127,28 +143,6 @@ public class KMeansCluster {
 		writer.close();
 	}
 	
-	/**
-	 * 读取原始数据。
-	 * @param original 原始数据目录
-	 * @return 原始数据键值对列表
-	 * @throws IOException 
-	 */
-	private static Map<String, String> readOriginalFile(String original) throws IOException {
-		File file = new File(original);
-		BufferedReader br = new BufferedReader(new FileReader(file));
-		String s = null;
-		Map<String, String> data = new HashMap<String, String>();
-		while ((s = br.readLine()) != null) {
-			// 使用readLine方法，一次读一行
-			String[] split = s.split(" ");
-			if(split != null && split.length >= 2) {
-				data.put(split[0], split[1]);
-			}
-		}
-		br.close();
-		return data;
-	}
-
 	/**
 	 * 入参校验
 	 * @param args 入参
@@ -160,7 +154,7 @@ public class KMeansCluster {
 		CommandLine commands = parser.parse(options, args);
 		if(!commands.hasOption("in")
 				|| !commands.hasOption("out")
-				|| !commands.hasOption("original")
+				|| !commands.hasOption("local")
 				|| !commands.hasOption("extJars")) {
 			printUsage(options);
 			return null;
@@ -177,7 +171,7 @@ public class KMeansCluster {
 		Options options = new Options();
 		options.addOption("in", true, "[required] HDFS path for kmeans input");
 		options.addOption("out", true, "[required] HDFS path for kmeans out");
-		options.addOption("original", true, "[required] original file path");
+		options.addOption("local", true, "[required] local data path");
 		options.addOption("extJars", true, "[required] HDFS path ext jars");
 		return options;
 	}
